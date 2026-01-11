@@ -1,0 +1,70 @@
+- name: create instance
+  hosts: local
+  connection: local
+  vars:
+    ami_id: ami-09c813fb71547fc4f
+    sg_id: sg-04a6373d80781814d
+    zone_id: Z08394983VCGATLL8SRZA
+    domain_name: "amaranath.fun"
+    # instances: 
+    # - mongodb
+    # - redis
+    # - rabbitmq
+    # - catalogue
+    # - mysql
+    # - cart 
+    # - user
+  tasks:
+  - name: create ec2 instance
+    amazon.aws.ec2_instance:
+      name: "{{ item }}"
+      instance_type: t3.micro
+      security_group: "{{ sg_id }}"
+      image_id: "{{ ami_id }}"
+      tags:
+        Name: "{{ item }}"
+    loop : "{{ instances }}"
+    register : ec2_output
+
+  # - name: print the ec2_output
+  #   ansible.builtin.debug:
+  #     msg: "{{ ec2_output }}"
+  
+  # - name: print public ip
+  #   ansible.builtin.debug:
+  #     msg: "{{ item.instances[0].public_ip_address }}"
+  #   loop: "{{ ec2_output.results }}"
+
+  # - name: print private ip
+  #   ansible.builtin.debug:
+  #     msg: "{{ item.instances[0].private_ip_address }}"
+  #   loop: "{{ec2_output.results}}"
+
+  - name: Create Route53 A record
+    amazon.aws.route53:
+      zone: "{{domain_name}}"
+      record: "{{item.item}}.{{domain_name}}"
+      type: A
+      ttl: 1
+      value: "{{ item.instances[0].private_ip_address }}"
+      state: present
+      overwrite: true
+    loop: "{{ec2_output.results}}"
+
+  - name: Create Route53 A record for frontend
+    amazon.aws.route53:
+      zone: "{{domain_name}}"
+      record: "{{domain_name}}"
+      type: A
+      ttl: 1
+      value: "{{ item.instances[0].public_ip_address }}"
+      state: present
+      overwrite: true
+    when: item.item == "frontend"
+    loop: "{{ ec2_output.results }}"
+    
+
+  
+
+
+
